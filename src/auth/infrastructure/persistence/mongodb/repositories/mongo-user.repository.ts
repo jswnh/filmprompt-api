@@ -7,10 +7,7 @@ import {
   UserWithPassword,
 } from '../../../../interfaces/user-repository.interface.js';
 import { User } from '../../../../domain/user.entity.js';
-import {
-  UserDocument,
-  UserSchemaClass,
-} from '../schemas/user.schema.js';
+import { UserDocument, UserSchemaClass } from '../schemas/user.schema.js';
 import { UserMapper } from '../mappers/user.mapper.js';
 
 @Injectable()
@@ -51,11 +48,11 @@ export class MongoUserRepository implements UserRepository {
   }
 
   async create(user: CreateUserInput): Promise<User> {
+    const { passwordHash, ...profile } = user;
     const created = await this.userModel.create({
+      ...profile,
       email: user.email.toLowerCase().trim(),
-      passwordHash: user.passwordHash ?? null,
-      firstName: user.firstName.trim(),
-      lastName: user.lastName.trim(),
+      passwordHash: passwordHash ?? null,
     });
     return UserMapper.toDomain(created);
   }

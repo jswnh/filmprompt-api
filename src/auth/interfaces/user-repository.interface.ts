@@ -1,13 +1,10 @@
-import { User } from '../domain/user.entity.js';
+import { User, UserProfile } from '../domain/user.entity.js';
 
 export const USER_REPOSITORY = Symbol('USER_REPOSITORY');
 
-export interface CreateUserInput {
-  email: string;
+export type CreateUserInput = UserProfile & {
   passwordHash?: string | null;
-  firstName: string;
-  lastName: string;
-}
+};
 
 export interface UserWithPassword {
   user: User;

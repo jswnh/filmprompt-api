@@ -29,8 +29,6 @@ export interface OAuthSignInInput {
   provider: AuthProvider;
   providerAccountId: string;
   email: string;
-  firstName: string;
-  lastName: string;
   emailVerified?: boolean;
   accessToken?: string | null;
   refreshToken?: string | null;
@@ -67,16 +65,16 @@ export class AuthService {
       return err({ code: 'EMAIL_IN_USE' });
     }
 
-    const passwordHash = await this.passwordHasher.hash(input.password);
+    const { password, callback, ...profile } = input;
+    const passwordHash = await this.passwordHasher.hash(password);
     const user = await this.userRepository.create({
+      ...profile,
       email: input.email,
       passwordHash,
-      firstName: input.firstName,
-      lastName: input.lastName,
     });
 
     // Automatically generate and dispatch email verification token
-    await this.sendVerificationEmail(user, input.callback);
+    await this.sendVerificationEmail(user, callback);
 
     return ok(user);
   }
@@ -154,8 +152,6 @@ export class AuthService {
         user = await this.userRepository.create({
           email: input.email,
           passwordHash: null,
-          firstName: input.firstName,
-          lastName: input.lastName,
         });
         if (input.emailVerified) {
           await this.userRepository.markEmailVerified(user.id);
@@ -208,7 +204,6 @@ export class AuthService {
 
     await this.emailService.sendVerificationEmail({
       to: user.email,
-      firstName: user.firstName,
       token: rawToken,
       callback,
     });
@@ -272,7 +267,6 @@ export class AuthService {
 
     await this.emailService.sendPasswordResetEmail({
       to: user.email,
-      firstName: user.firstName,
       token: rawToken,
       callback,
     });

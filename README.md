@@ -46,101 +46,146 @@ $ pnpm run start:prod
 
 ## Authentication & Clean Architecture Guide
 
-The authentication module follows **Clean Architecture & Domain-Driven Design (DDD)** principles to keep domain logic decoupled from infrastructure (MongoDB/Mongoose) and transport (HTTP/Zod).
+The authentication module uses a **Single Master Zod Schema (`userProfileSchema`)** as the single source of truth for user profile properties.
+
+Whenever you add or remove a field in `userProfileSchema`, TypeScript strict type checking ensures you only update the necessary files, highlighting missing mappings in **red** compile errors.
 
 ---
 
-### How to Add a New Field / Column to `User`
+### ➕ Example: Adding a `name` Field
 
-When you want to add a new property (e.g. `avatarUrl`, `role`, `phoneNumber`, `bio`) to the `User`, follow these steps:
+Let's walk through adding a required `name` field to the `User`.
 
-#### Step 1: Update the Domain Entity
-📁 [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts)  
-Add the new property to the `User` class:
+#### Step 1: Add `name` to the Master Schema
+📁 **File:** [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts)
+
+Add `name` to `userProfileSchema`:
+
 ```typescript
-export class User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  avatarUrl: string | null; // 👈 Add field here
-  // ...
-}
+// src/auth/domain/user.entity.ts
+export const userProfileSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1), // 👈 1. ADD YOUR FIELD HERE
+});
+
+export type UserProfile = z.infer<typeof userProfileSchema>;
 ```
 
-#### Step 2: Update the MongoDB Mongoose Schema
-📁 [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts)  
-Add the Mongoose `@Prop` decorator and type:
+---
+
+#### Step 2: Add Mongoose `@Prop` in the Database Schema
+📁 **File:** [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts)
+
+Add the property for MongoDB storage:
+
 ```typescript
+// src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts
 @Schema({ collection: 'users', timestamps: true })
 export class UserSchemaClass {
-  // ...
+  @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
+  email: string;
+
+  @Prop({ type: String, required: true, trim: true }) // 👈 2. ADD MONGO PROPERTY
+  name: string;
+
   @Prop({ type: String, default: null })
-  avatarUrl: string | null; // 👈 Add Mongo property here
+  passwordHash: string | null;
+  // ...
 }
 ```
 
-#### Step 3: Update the Persistence Mapper
-📁 [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts)  
-Map the MongoDB document field into the domain entity:
+---
+
+#### Step 3: Map the Field in `UserMapper` (TypeScript turns RED here!)
+📁 **File:** [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts)
+
+Because `UserProfile` now requires `name`, TypeScript will immediately show a **red error**:
+> 🚨 *Property 'name' is missing in type '{ email: string; }' but required in type 'UserProfile'.*
+
+Fix it by mapping `doc.name`:
+
 ```typescript
+// src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts
 export class UserMapper {
   static toDomain(doc: UserDocument): User {
-    return new User({
-      id: doc._id.toString(),
+    const profile: UserProfile = {
       email: doc.email,
-      firstName: doc.firstName,
-      lastName: doc.lastName,
-      avatarUrl: doc.avatarUrl ?? null, // 👈 Map field here
-      // ...
+      name: doc.name, // 👈 3. MAP THE FIELD HERE (clears the red error)
+    };
+
+    const system: UserSystemFields = {
+      id: doc._id.toString(),
+      emailVerifiedAt: doc.emailVerifiedAt ?? null,
+      emailVerificationTokenHash: doc.emailVerificationTokenHash ?? null,
+      emailVerificationExpiresAt: doc.emailVerificationExpiresAt ?? null,
+      passwordResetTokenHash: doc.passwordResetTokenHash ?? null,
+      passwordResetExpiresAt: doc.passwordResetExpiresAt ?? null,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    };
+
+    return new User({
+      ...profile,
+      ...system,
     });
   }
 }
 ```
 
-#### Step 4: Update Repository Interfaces & Implementation
-📁 [`src/auth/interfaces/user-repository.interface.ts`](src/auth/interfaces/user-repository.interface.ts)  
-Update `CreateUserInput` or any specific query/update methods:
-```typescript
-export interface CreateUserInput {
-  email: string;
-  passwordHash?: string | null;
-  firstName: string;
-  lastName: string;
-  avatarUrl?: string | null; // 👈 Add to creation input
-}
-```
+---
 
-📁 [`src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts`](src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts)  
-Persist the field in `create()`:
-```typescript
-async create(user: CreateUserInput): Promise<User> {
-  const created = await this.userModel.create({
-    email: user.email.toLowerCase().trim(),
-    passwordHash: user.passwordHash ?? null,
-    firstName: user.firstName.trim(),
-    lastName: user.lastName.trim(),
-    avatarUrl: user.avatarUrl ?? null, // 👈 Save to MongoDB
-  });
-  return UserMapper.toDomain(created);
-}
-```
-
-#### Step 5 (Optional): Update DTO Validation & Controller
-If the field is accepted during Sign Up or returned in responses:
-* 📁 [`src/auth/dto/sign-up.dto.ts`](src/auth/dto/sign-up.dto.ts): Add validation to `signUpSchema` (e.g. `avatarUrl: z.string().url().optional()`).
-* 📁 [`src/auth/controllers/auth.controller.ts`](src/auth/controllers/auth.controller.ts): Include `avatarUrl: user.avatarUrl` in `getSession()` or `signUp()` response payload if desired.
+#### 🎉 That's it! Everything else works automatically:
+1. **`POST /api/v1/auth/sign-up`**: `signUpSchema` automatically requires `{ email, password, name }`.
+2. **`GET /api/v1/auth/session` & `POST /sign-in`**: Responses automatically return `{ id, email, name, emailVerified, ... }`.
+3. **`MongoUserRepository.create`**: Automatically saves `name` to MongoDB.
+4. **`@CurrentUser() user: User`**: Contains `user.name` in any controller across your application.
 
 ---
 
-### How to Remove a Field / Column from `User`
+### ➖ Example: Removing the `name` Field
 
-To safely remove a field:
-1. **Remove from Domain Entity:** Delete the property from [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts).
-2. **Remove from Mapper:** Delete the field mapping in [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts).
-3. **Remove from Repository:** Delete from `CreateUserInput` in [`src/auth/interfaces/user-repository.interface.ts`](src/auth/interfaces/user-repository.interface.ts) and [`src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts`](src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts).
-4. **Remove from Schema:** Delete the `@Prop` in [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts).
-5. **Remove from DTOs / Controllers:** Clean up any DTOs or Controller responses referencing the old property.
+When you want to remove the `name` field, simply follow these 3 steps:
+
+#### Step 1: Remove from Master Schema
+📁 **File:** [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts)
+
+```typescript
+// Delete the 'name' line from userProfileSchema:
+export const userProfileSchema = z.object({
+  email: z.string().email(),
+});
+```
+
+---
+
+#### Step 2: Remove from `UserMapper` (TypeScript turns RED on the old property!)
+📁 **File:** [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts)
+
+TypeScript will show a **red error** on `name: doc.name`. Delete that line:
+
+```typescript
+const profile: UserProfile = {
+  email: doc.email, // 👈 'name' removed
+};
+```
+
+---
+
+#### Step 3: Remove Mongoose `@Prop` from Database Schema
+📁 **File:** [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts)
+
+Delete the `@Prop` for `name`:
+
+```typescript
+// Delete this line:
+// @Prop({ type: String, required: true, trim: true })
+// name: string;
+```
+
+---
+
+#### 🎉 Done!
+All DTOs, controllers, responses, and types update automatically!
 
 ---
 

@@ -5,14 +5,14 @@ import authConfig from '../config/auth.config.js';
 
 export interface SendVerificationEmailInput {
   to: string;
-  firstName: string;
+  name?: string;
   token: string;
   callback?: string;
 }
 
 export interface SendPasswordResetEmailInput {
   to: string;
-  firstName: string;
+  name?: string;
   token: string;
   callback?: string;
 }
@@ -50,14 +50,15 @@ export class EmailService {
       ? `${input.callback}${input.callback.includes('?') ? '&' : '?'}token=${encodeURIComponent(input.token)}`
       : null;
 
+    const greeting = input.name ? `Hi ${input.name},` : 'Hello,';
     const subject = 'Verify your email address';
     const text =
-      `Hi ${input.firstName},\n\nPlease verify your email address.\n\nToken: ${input.token}\n` +
+      `${greeting}\n\nPlease verify your email address.\n\nToken: ${input.token}\n` +
       (actionUrl ? `\nVerification Link: ${actionUrl}\n` : '');
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #333;">Welcome, ${input.firstName}!</h2>
+        <h2 style="color: #333;">Welcome!</h2>
         <p style="color: #555;">Please verify your email address to activate your account.</p>
         ${
           actionUrl
@@ -87,7 +88,7 @@ export class EmailService {
         `\n================= [EMAIL VERIFICATION] =================\n` +
           `To: ${input.to}\n` +
           `Subject: ${subject}\n` +
-          `Hi ${input.firstName},\n` +
+          `${greeting}\n` +
           `Token: ${input.token}\n` +
           (actionUrl ? `Link: ${actionUrl}\n` : '') +
           `========================================================\n`,
@@ -102,15 +103,16 @@ export class EmailService {
       ? `${input.callback}${input.callback.includes('?') ? '&' : '?'}token=${encodeURIComponent(input.token)}`
       : null;
 
+    const greeting = input.name ? `Hi ${input.name},` : 'Hello,';
     const subject = 'Reset your password';
     const text =
-      `Hi ${input.firstName},\n\nYou requested to reset your password.\n\nToken: ${input.token}\n` +
+      `${greeting}\n\nYou requested to reset your password.\n\nToken: ${input.token}\n` +
       (actionUrl ? `\nReset Link: ${actionUrl}\n` : '');
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
         <h2 style="color: #333;">Password Reset Request</h2>
-        <p style="color: #555;">Hi ${input.firstName}, we received a request to reset your password. If you didn't make this request, you can safely ignore this email.</p>
+        <p style="color: #555;">We received a request to reset your password. If you didn't make this request, you can safely ignore this email.</p>
         ${
           actionUrl
             ? `<div style="margin: 25px 0;">
@@ -139,7 +141,7 @@ export class EmailService {
         `\n================= [PASSWORD RESET] =================\n` +
           `To: ${input.to}\n` +
           `Subject: ${subject}\n` +
-          `Hi ${input.firstName},\n` +
+          `${greeting}\n` +
           `Token: ${input.token}\n` +
           (actionUrl ? `Link: ${actionUrl}\n` : '') +
           `====================================================\n`,

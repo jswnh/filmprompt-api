@@ -20,12 +20,6 @@ export class UserSchemaClass {
   @Prop({ type: Date, default: null })
   emailVerifiedAt: Date | null;
 
-  @Prop({ required: true, trim: true })
-  firstName: string;
-
-  @Prop({ required: true, trim: true })
-  lastName: string;
-
   @Prop({ type: String, default: null, index: true })
   emailVerificationTokenHash: string | null;
 

@@ -6,8 +6,7 @@ export interface GoogleUserInfo {
   id: string;
   email: string;
   emailVerified: boolean;
-  firstName: string;
-  lastName: string;
+  name?: string;
   picture?: string;
 }
 
@@ -101,19 +100,8 @@ export class GoogleAuthService {
       email: string;
       email_verified?: boolean;
       name?: string;
-      given_name?: string;
-      family_name?: string;
       picture?: string;
     };
-
-    const firstName =
-      userData.given_name ||
-      (userData.name ? userData.name.split(' ')[0] : 'User');
-    const lastName =
-      userData.family_name ||
-      (userData.name && userData.name.split(' ').length > 1
-        ? userData.name.split(' ').slice(1).join(' ')
-        : '');
 
     return {
       tokens: {
@@ -125,8 +113,7 @@ export class GoogleAuthService {
         id: userData.sub,
         email: userData.email,
         emailVerified: Boolean(userData.email_verified),
-        firstName,
-        lastName,
+        name: userData.name,
         picture: userData.picture,
       },
     };
@@ -146,8 +133,6 @@ export class GoogleAuthService {
       email: string;
       email_verified?: string | boolean;
       name?: string;
-      given_name?: string;
-      family_name?: string;
       picture?: string;
       aud?: string;
     };
@@ -156,21 +141,12 @@ export class GoogleAuthService {
       throw new BadRequestException('Google ID token audience mismatch.');
     }
 
-    const firstName =
-      data.given_name || (data.name ? data.name.split(' ')[0] : 'User');
-    const lastName =
-      data.family_name ||
-      (data.name && data.name.split(' ').length > 1
-        ? data.name.split(' ').slice(1).join(' ')
-        : '');
-
     return {
       id: data.sub,
       email: data.email,
       emailVerified:
         data.email_verified === 'true' || data.email_verified === true,
-      firstName,
-      lastName,
+      name: data.name,
       picture: data.picture,
     };
   }

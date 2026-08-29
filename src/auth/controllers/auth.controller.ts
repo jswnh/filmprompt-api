@@ -116,14 +116,7 @@ export class AuthController {
     }
     return {
       ok: true as const,
-      user: {
-        id: result.value.id,
-        email: result.value.email,
-        firstName: result.value.firstName,
-        lastName: result.value.lastName,
-        emailVerified: Boolean(result.value.emailVerifiedAt),
-        emailVerifiedAt: result.value.emailVerifiedAt,
-      },
+      user: result.value.toResponse(),
     };
   }
 
@@ -156,14 +149,7 @@ export class AuthController {
 
     return {
       ok: true as const,
-      user: {
-        id: result.value.user.id,
-        email: result.value.user.email,
-        firstName: result.value.user.firstName,
-        lastName: result.value.user.lastName,
-        emailVerified: Boolean(result.value.user.emailVerifiedAt),
-        emailVerifiedAt: result.value.user.emailVerifiedAt,
-      },
+      user: result.value.user.toResponse(),
     };
   }
 
@@ -201,20 +187,10 @@ export class AuthController {
 
   @Get('session')
   @UseGuards(SessionGuard)
-  getSession(
-    @CurrentUser() user: User,
-    @CurrentSession() session: Session,
-  ) {
+  getSession(@CurrentUser() user: User, @CurrentSession() session: Session) {
     return {
       ok: true as const,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        emailVerified: Boolean(user.emailVerifiedAt),
-        emailVerifiedAt: user.emailVerifiedAt,
-      },
+      user: user.toResponse(),
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
@@ -252,8 +228,6 @@ export class AuthController {
       provider: 'google',
       providerAccountId: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
       emailVerified: user.emailVerified,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -274,14 +248,7 @@ export class AuthController {
 
     return {
       ok: true as const,
-      user: {
-        id: result.value.user.id,
-        email: result.value.user.email,
-        firstName: result.value.user.firstName,
-        lastName: result.value.user.lastName,
-        emailVerified: Boolean(result.value.user.emailVerifiedAt),
-        emailVerifiedAt: result.value.user.emailVerifiedAt,
-      },
+      user: result.value.user.toResponse(),
     };
   }
 
@@ -299,8 +266,6 @@ export class AuthController {
       provider: 'google',
       providerAccountId: googleUser.id,
       email: googleUser.email,
-      firstName: googleUser.firstName,
-      lastName: googleUser.lastName,
       emailVerified: googleUser.emailVerified,
       rememberMe: body.rememberMe,
       userAgent: req.headers['user-agent'],
@@ -320,14 +285,7 @@ export class AuthController {
 
     return {
       ok: true as const,
-      user: {
-        id: result.value.user.id,
-        email: result.value.user.email,
-        firstName: result.value.user.firstName,
-        lastName: result.value.user.lastName,
-        emailVerified: Boolean(result.value.user.emailVerifiedAt),
-        emailVerifiedAt: result.value.user.emailVerifiedAt,
-      },
+      user: result.value.user.toResponse(),
     };
   }
 
