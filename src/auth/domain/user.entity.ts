@@ -1,14 +1,7 @@
 import { z } from 'zod';
 
-// ============================================================================
-// 🌟 MASTER USER PROFILE SCHEMA (SINGLE SOURCE OF TRUTH)
-// Add or remove your custom user fields right here!
-// Adding a field here will cause TypeScript to highlight in red all locations
-// that require mapping (Mapper, Mongo Repository, etc.)
-// ============================================================================
 export const userProfileSchema = z.object({
-  email: z.string().email(),
-  // 👇 Add your custom user fields below (e.g. name, avatarUrl, role):
+  email: z.email(),
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;

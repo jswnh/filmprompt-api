@@ -52,6 +52,21 @@ Whenever you add or remove a field in `userProfileSchema`, TypeScript strict typ
 
 ---
 
+### 📋 All Interfaces Automatically Aware of Profile Fields
+
+Because all domain and transport types are derived directly from `userProfileSchema`, you never need to manually update these interfaces:
+
+| Interface / Type | File Location | How It Adapts |
+| :--- | :--- | :--- |
+| **`UserProfile`** | [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts) | `z.infer<typeof userProfileSchema>` — contains all your custom fields. |
+| **`UserResponse`** | [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts) | `UserProfile & UserSystemFields` — powers `user.toResponse()`. |
+| **`CreateUserInput`** | [`src/auth/interfaces/user-repository.interface.ts`](src/auth/interfaces/user-repository.interface.ts) | `UserProfile & { passwordHash?: string \| null }` — strictly enforced on creation. |
+| **`SignUpDto`** | [`src/auth/dto/sign-up.dto.ts`](src/auth/dto/sign-up.dto.ts) | `z.infer<typeof signUpSchema>` (extends `userProfileSchema`). |
+| **`OAuthSignInInput`** | [`src/auth/services/auth.service.ts`](src/auth/services/auth.service.ts) | `Partial<UserProfile> & { ... }` — forwards custom profile fields during OAuth. |
+| **`User` Entity** | [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts) | Accepts `UserProfile & UserSystemFields` and spreads in `toResponse()`. |
+
+---
+
 ### ➕ Example: Adding a `name` Field
 
 Let's walk through adding a required `name` field to the `User`.
@@ -64,8 +79,8 @@ Add `name` to `userProfileSchema`:
 ```typescript
 // src/auth/domain/user.entity.ts
 export const userProfileSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1), // 👈 1. ADD YOUR FIELD HERE
+  email: z.email(),
+  name: z.string().min(1), // 👈 1. ADD YOUR FIELD HERE (e.g. z.string(), z.url(), z.number())
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
@@ -152,7 +167,7 @@ When you want to remove the `name` field, simply follow these 3 steps:
 ```typescript
 // Delete the 'name' line from userProfileSchema:
 export const userProfileSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 ```
 

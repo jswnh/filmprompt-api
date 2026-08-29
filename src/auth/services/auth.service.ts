@@ -25,7 +25,7 @@ export type SignInInput = SignInDto & {
   ip?: string | null;
 };
 
-export interface OAuthSignInInput {
+export type OAuthSignInInput = Partial<UserProfile> & {
   provider: AuthProvider;
   providerAccountId: string;
   email: string;
@@ -35,7 +35,7 @@ export interface OAuthSignInInput {
   rememberMe?: number | null;
   userAgent?: string | null;
   ip?: string | null;
-}
+};
 
 export interface SignInResult {
   user: User;
@@ -149,7 +149,19 @@ export class AuthService {
           refreshToken: input.refreshToken ?? null,
         });
       } else {
+        const {
+          provider,
+          providerAccountId,
+          accessToken,
+          refreshToken,
+          rememberMe,
+          userAgent,
+          ip,
+          emailVerified,
+          ...profile
+        } = input;
         user = await this.userRepository.create({
+          ...profile,
           email: input.email,
           passwordHash: null,
         });
