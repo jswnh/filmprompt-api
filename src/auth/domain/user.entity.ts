@@ -1,7 +1,6 @@
 export class User {
   id: string;
   email: string;
-  passwordHash: string | null;
   emailVerifiedAt: Date | null;
   firstName: string;
   lastName: string;

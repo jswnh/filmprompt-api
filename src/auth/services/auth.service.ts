@@ -82,19 +82,23 @@ export class AuthService {
   }
 
   async signIn(input: SignInInput): Promise<Result<SignInResult, AuthError>> {
-    const user = await this.userRepository.findByEmail(input.email);
+    const credentials = await this.userRepository.findWithPasswordByEmail(
+      input.email,
+    );
     // Same generic error whether the user doesn't exist or the password is wrong
-    if (!user || !user.passwordHash) {
+    if (!credentials || !credentials.passwordHash) {
       return err({ code: 'INVALID_CREDENTIALS' });
     }
 
     const valid = await this.passwordHasher.verify(
-      user.passwordHash,
+      credentials.passwordHash,
       input.password,
     );
     if (!valid) {
       return err({ code: 'INVALID_CREDENTIALS' });
     }
+
+    const user = credentials.user;
 
     if (!user.emailVerifiedAt) {
       return err({ code: 'EMAIL_NOT_VERIFIED' });

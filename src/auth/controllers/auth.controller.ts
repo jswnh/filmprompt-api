@@ -50,6 +50,10 @@ import {
   type RequestWithSession,
 } from '../guards/session.guard.js';
 import { CurrentUserId } from '../decorators/current-user-id.decorator.js';
+import { CurrentUser } from '../decorators/current-user.decorator.js';
+import { CurrentSession } from '../decorators/current-session.decorator.js';
+import { User } from '../domain/user.entity.js';
+import { Session } from '../domain/session.entity.js';
 import { AuthError } from '../errors/auth-error.js';
 
 function mapAuthErrorToHttpException(error: AuthError): HttpException {
@@ -195,22 +199,28 @@ export class AuthController {
     return { ok: true as const };
   }
 
-  @Get('me')
+  @Get('session')
   @UseGuards(SessionGuard)
-  async me(@CurrentUserId() userId: string) {
-    const result = await this.authService.getProfile(userId);
-    if (!result.ok) {
-      throw mapAuthErrorToHttpException(result.error);
-    }
+  getSession(
+    @CurrentUser() user: User,
+    @CurrentSession() session: Session,
+  ) {
     return {
       ok: true as const,
       user: {
-        id: result.value.id,
-        email: result.value.email,
-        firstName: result.value.firstName,
-        lastName: result.value.lastName,
-        emailVerified: Boolean(result.value.emailVerifiedAt),
-        emailVerifiedAt: result.value.emailVerifiedAt,
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailVerified: Boolean(user.emailVerifiedAt),
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+      session: {
+        id: session.id,
+        expiresAt: session.expiresAt,
+        rememberMe: session.rememberMe,
+        userAgent: session.userAgent,
+        ip: session.ip,
       },
     };
   }

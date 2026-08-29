@@ -44,6 +44,106 @@ $ pnpm run start:dev
 $ pnpm run start:prod
 ```
 
+## Authentication & Clean Architecture Guide
+
+The authentication module follows **Clean Architecture & Domain-Driven Design (DDD)** principles to keep domain logic decoupled from infrastructure (MongoDB/Mongoose) and transport (HTTP/Zod).
+
+---
+
+### How to Add a New Field / Column to `User`
+
+When you want to add a new property (e.g. `avatarUrl`, `role`, `phoneNumber`, `bio`) to the `User`, follow these steps:
+
+#### Step 1: Update the Domain Entity
+📁 [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts)  
+Add the new property to the `User` class:
+```typescript
+export class User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null; // 👈 Add field here
+  // ...
+}
+```
+
+#### Step 2: Update the MongoDB Mongoose Schema
+📁 [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts)  
+Add the Mongoose `@Prop` decorator and type:
+```typescript
+@Schema({ collection: 'users', timestamps: true })
+export class UserSchemaClass {
+  // ...
+  @Prop({ type: String, default: null })
+  avatarUrl: string | null; // 👈 Add Mongo property here
+}
+```
+
+#### Step 3: Update the Persistence Mapper
+📁 [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts)  
+Map the MongoDB document field into the domain entity:
+```typescript
+export class UserMapper {
+  static toDomain(doc: UserDocument): User {
+    return new User({
+      id: doc._id.toString(),
+      email: doc.email,
+      firstName: doc.firstName,
+      lastName: doc.lastName,
+      avatarUrl: doc.avatarUrl ?? null, // 👈 Map field here
+      // ...
+    });
+  }
+}
+```
+
+#### Step 4: Update Repository Interfaces & Implementation
+📁 [`src/auth/interfaces/user-repository.interface.ts`](src/auth/interfaces/user-repository.interface.ts)  
+Update `CreateUserInput` or any specific query/update methods:
+```typescript
+export interface CreateUserInput {
+  email: string;
+  passwordHash?: string | null;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string | null; // 👈 Add to creation input
+}
+```
+
+📁 [`src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts`](src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts)  
+Persist the field in `create()`:
+```typescript
+async create(user: CreateUserInput): Promise<User> {
+  const created = await this.userModel.create({
+    email: user.email.toLowerCase().trim(),
+    passwordHash: user.passwordHash ?? null,
+    firstName: user.firstName.trim(),
+    lastName: user.lastName.trim(),
+    avatarUrl: user.avatarUrl ?? null, // 👈 Save to MongoDB
+  });
+  return UserMapper.toDomain(created);
+}
+```
+
+#### Step 5 (Optional): Update DTO Validation & Controller
+If the field is accepted during Sign Up or returned in responses:
+* 📁 [`src/auth/dto/sign-up.dto.ts`](src/auth/dto/sign-up.dto.ts): Add validation to `signUpSchema` (e.g. `avatarUrl: z.string().url().optional()`).
+* 📁 [`src/auth/controllers/auth.controller.ts`](src/auth/controllers/auth.controller.ts): Include `avatarUrl: user.avatarUrl` in `getSession()` or `signUp()` response payload if desired.
+
+---
+
+### How to Remove a Field / Column from `User`
+
+To safely remove a field:
+1. **Remove from Domain Entity:** Delete the property from [`src/auth/domain/user.entity.ts`](src/auth/domain/user.entity.ts).
+2. **Remove from Mapper:** Delete the field mapping in [`src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts`](src/auth/infrastructure/persistence/mongodb/mappers/user.mapper.ts).
+3. **Remove from Repository:** Delete from `CreateUserInput` in [`src/auth/interfaces/user-repository.interface.ts`](src/auth/interfaces/user-repository.interface.ts) and [`src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts`](src/auth/infrastructure/persistence/mongodb/repositories/mongo-user.repository.ts).
+4. **Remove from Schema:** Delete the `@Prop` in [`src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts`](src/auth/infrastructure/persistence/mongodb/schemas/user.schema.ts).
+5. **Remove from DTOs / Controllers:** Clean up any DTOs or Controller responses referencing the old property.
+
+---
+
 ## Run tests
 
 ```bash

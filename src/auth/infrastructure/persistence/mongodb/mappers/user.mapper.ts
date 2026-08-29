@@ -6,7 +6,6 @@ export class UserMapper {
     return new User({
       id: doc._id.toString(),
       email: doc.email,
-      passwordHash: doc.passwordHash ?? null,
       emailVerifiedAt: doc.emailVerifiedAt ?? null,
       firstName: doc.firstName,
       lastName: doc.lastName,

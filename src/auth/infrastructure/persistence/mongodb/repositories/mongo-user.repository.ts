@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { UserRepository } from '../../../../interfaces/user-repository.interface.js';
+import {
+  CreateUserInput,
+  UserRepository,
+  UserWithPassword,
+} from '../../../../interfaces/user-repository.interface.js';
 import { User } from '../../../../domain/user.entity.js';
 import {
   UserDocument,
@@ -31,12 +35,25 @@ export class MongoUserRepository implements UserRepository {
     return doc ? UserMapper.toDomain(doc) : null;
   }
 
-  async create(
-    user: Pick<User, 'email' | 'passwordHash' | 'firstName' | 'lastName'>,
-  ): Promise<User> {
+  async findWithPasswordByEmail(
+    email: string,
+  ): Promise<UserWithPassword | null> {
+    const doc = await this.userModel
+      .findOne({ email: email.toLowerCase().trim() })
+      .exec();
+    if (!doc) {
+      return null;
+    }
+    return {
+      user: UserMapper.toDomain(doc),
+      passwordHash: doc.passwordHash ?? null,
+    };
+  }
+
+  async create(user: CreateUserInput): Promise<User> {
     const created = await this.userModel.create({
       email: user.email.toLowerCase().trim(),
-      passwordHash: user.passwordHash,
+      passwordHash: user.passwordHash ?? null,
       firstName: user.firstName.trim(),
       lastName: user.lastName.trim(),
     });

@@ -67,6 +67,7 @@ export class AuthModule {
     };
 
     return {
+      global: true,
       module: AuthModule,
       imports: [
         ConfigModule.forFeature(authConfig),
@@ -86,6 +87,9 @@ export class AuthModule {
         SessionGuard,
       ],
       exports: [
+        USER_REPOSITORY,
+        SESSION_REPOSITORY,
+        IDENTITY_REPOSITORY,
         AuthService,
         SessionService,
         GoogleAuthService,
