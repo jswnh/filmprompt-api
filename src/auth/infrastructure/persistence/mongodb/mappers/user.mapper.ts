@@ -7,12 +7,18 @@ import { UserDocument } from '../schemas/user.schema.js';
 
 export class UserMapper {
   static toDomain(doc: UserDocument): User {
-    // 💡 Strict typing: If you add a field to userProfileSchema,
-    // TypeScript will immediately turn RED here until you map it!
     const profile: UserProfile = {
+      // 🔒 Origin field:
       email: doc.email,
+
+      // ➕ Custom fields mapped from Mongo document:
+      // name: doc.name,
+      // avatarUrl: doc.avatarUrl ?? null,
     };
 
+    // ========================================================================
+    // 🔒 ORIGIN SYSTEM FIELDS (DO NOT REMOVE)
+    // ========================================================================
     const system: UserSystemFields = {
       id: doc._id.toString(),
       emailVerifiedAt: doc.emailVerifiedAt ?? null,
