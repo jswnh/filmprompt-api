@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import {
+  AppService,
+  MongoTestSchema,
+  MongoTestSchemaClass,
+} from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module.js';
@@ -11,6 +15,7 @@ import { MongoSessionRepository } from './auth/infrastructure/persistence/mongod
 import { MongoIdentityRepository } from './auth/infrastructure/persistence/mongodb/repositories/mongo-identity.repository.js';
 import authConfig from './auth/config/auth.config.js';
 import databaseConfig from './database/config/database.config.js';
+import { MongooseModule } from '@nestjs/mongoose';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -44,6 +49,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
         identityRepository,
       }),
     }),
+    MongooseModule.forFeature([
+      { name: MongoTestSchemaClass.name, schema: MongoTestSchema },
+    ]),
   ],
   controllers: [AppController],
   providers: [AppService],

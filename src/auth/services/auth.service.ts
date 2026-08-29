@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import * as config from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
-import { User } from '../domain/user.entity.js';
+import { User, UserProfile } from '../domain/user.entity.js';
 import { AuthProvider } from '../domain/identity.entity.js';
 import { CreatedSession, SessionService } from './session.service.js';
 import authConfig from '../config/auth.config.js';
@@ -199,10 +199,7 @@ export class AuthService {
     return ok(undefined);
   }
 
-  async sendVerificationEmail(
-    user: User,
-    callback?: string,
-  ): Promise<void> {
+  async sendVerificationEmail(user: User, callback?: string): Promise<void> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
     const ttlMs = this.config.emailVerificationTtlHours * 60 * 60 * 1000;
