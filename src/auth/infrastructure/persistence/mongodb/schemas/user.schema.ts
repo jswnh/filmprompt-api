@@ -5,6 +5,9 @@ export type UserDocument = HydratedDocument<UserSchemaClass>;
 
 @Schema({ collection: 'users', timestamps: true })
 export class UserSchemaClass {
+  // ==========================================================================
+  // 🔒 ORIGIN SYSTEM & AUTH FIELDS (DO NOT REMOVE)
+  // ==========================================================================
   @Prop({
     required: true,
     unique: true,
@@ -34,6 +37,16 @@ export class UserSchemaClass {
 
   createdAt: Date;
   updatedAt: Date;
+
+  // ==========================================================================
+  // ➕ CUSTOMIZABLE FIELDS (ADD / REMOVE YOUR MONGO PROPERTIES HERE)
+  // Examples:
+  // @Prop({ type: String, default: null, trim: true })
+  // name: string | null;
+  //
+  // @Prop({ type: String, default: null })
+  // avatarUrl: string | null;
+  // ==========================================================================
 }
 
 export const UserSchema = SchemaFactory.createForClass(UserSchemaClass);
