@@ -10,7 +10,7 @@ import {
 
 export interface CreateSessionInput {
   id: string;
-  rememberMe: boolean;
+  rememberMe?: number | null;
   userAgent?: string | null;
   ip?: string | null;
 }
@@ -46,9 +46,13 @@ export class SessionService {
   async createSession(input: CreateSessionInput): Promise<CreatedSession> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
-    const ttl = input.rememberMe
-      ? this.config.rememberMeTtlMs
-      : this.config.sessionTtlMs;
+    const hours =
+      input.rememberMe !== undefined &&
+      input.rememberMe !== null &&
+      input.rememberMe > 0
+        ? Math.min(input.rememberMe, this.config.maxRememberMeHours)
+        : this.config.defaultSessionTtlHours;
+    const ttlMs = hours * 60 * 60 * 1000;
     const now = new Date();
 
     const session = await this.sessionRepository.create({
@@ -56,8 +60,8 @@ export class SessionService {
       tokenHash,
       userAgent: input.userAgent ?? null,
       ip: input.ip ?? null,
-      rememberMe: input.rememberMe,
-      expiresAt: new Date(now.getTime() + ttl),
+      rememberMe: input.rememberMe ?? null,
+      expiresAt: new Date(now.getTime() + ttlMs),
     });
 
     return { session, rawToken };
@@ -85,18 +89,16 @@ export class SessionService {
     await this.sessionRepository.deleteAllForUser(userId);
   }
 
-  getCookieOptions(rememberMe: boolean): SessionCookieOptions {
-    const ttl = rememberMe
-      ? this.config.rememberMeTtlMs
-      : this.config.sessionTtlMs;
+  getCookieOptions(expiresAt: Date): SessionCookieOptions {
+    const now = new Date();
+    const maxAge = Math.max(0, expiresAt.getTime() - now.getTime());
     return {
       httpOnly: true,
       secure: this.config.cookieSecure,
       sameSite: 'lax',
       domain: this.config.cookieDomain,
       path: '/',
-      // Omitting maxAge makes it a browser-session cookie (cleared on browser close)
-      maxAge: rememberMe ? ttl : undefined,
+      maxAge,
     };
   }
 

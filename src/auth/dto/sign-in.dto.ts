@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const signInSchema = z.object({
   email: z.email(),
   password: z.string().min(1),
-  rememberMe: z.boolean().optional().default(false),
+  rememberMe: z.number().int().positive().optional(),
 });
 
 export type SignInDto = z.infer<typeof signInSchema>;

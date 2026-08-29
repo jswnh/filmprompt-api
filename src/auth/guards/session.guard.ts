@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { SessionService } from '../services/session.service.js';
 import { Session } from '../domain/session.entity.js';
@@ -17,12 +22,12 @@ export class SessionGuard implements CanActivate {
     const token: unknown = request.cookies?.[this.sessionService.cookieName];
 
     if (typeof token !== 'string' || token.length === 0) {
-      return false;
+      throw new UnauthorizedException('Authentication session required.');
     }
 
     const session = await this.sessionService.validateToken(token);
     if (!session) {
-      return false;
+      throw new UnauthorizedException('Session is invalid or has expired.');
     }
 
     request.session = session;

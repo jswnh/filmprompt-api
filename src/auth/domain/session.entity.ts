@@ -4,7 +4,7 @@ export class Session {
   tokenHash: string;
   userAgent: string | null;
   ip: string | null;
-  rememberMe: boolean;
+  rememberMe: number | null;
   expiresAt: Date;
   createdAt: Date;
   lastUsedAt: Date;

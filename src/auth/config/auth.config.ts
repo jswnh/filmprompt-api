@@ -2,27 +2,32 @@ import { registerAs } from '@nestjs/config';
 
 export interface AuthConfig {
   cookieName: string;
-  sessionTtlMs: number;
-  rememberMeTtlMs: number;
+  defaultSessionTtlHours: number;
+  maxRememberMeHours: number;
   cookieDomain: string | undefined;
   cookieSecure: boolean;
   googleClientId: string | null;
   googleClientSecret: string | null;
+  googleCallbackUrl: string | null;
   bcryptSaltRounds: number;
 }
 
 export default registerAs('auth', (): AuthConfig => ({
   cookieName: process.env.AUTH_COOKIE_NAME ?? 'sid',
-  // 2 hours default for a normal session
-  sessionTtlMs: Number(process.env.AUTH_SESSION_TTL_MS ?? 1000 * 60 * 60 * 2),
-  // 30 days default when "remember me" is checked
-  rememberMeTtlMs: Number(
-    process.env.AUTH_REMEMBER_ME_TTL_MS ?? 1000 * 60 * 60 * 24 * 30,
+  // Default session duration in hours when rememberMe is omitted (e.g. 24 hours)
+  defaultSessionTtlHours: Number(
+    process.env.AUTH_DEFAULT_SESSION_TTL_HOURS ?? 24,
+  ),
+  // Maximum custom hours allowed when rememberMe is provided (e.g. 720 hours = 30 days)
+  maxRememberMeHours: Number(
+    process.env.AUTH_MAX_REMEMBER_ME_HOURS ?? 720,
   ),
   cookieDomain: process.env.AUTH_COOKIE_DOMAIN,
   cookieSecure: process.env.NODE_ENV === 'production',
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? null,
-  // Intentionally null for now — wired up when Google OAuth is added later
-  googleClientSecret: null,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? null,
+  googleCallbackUrl:
+    process.env.GOOGLE_CALLBACK_URL ??
+    'http://localhost:3000/api/v1/auth/google/callback',
   bcryptSaltRounds: Number(process.env.AUTH_BCRYPT_SALT_ROUNDS ?? 12),
 }));
