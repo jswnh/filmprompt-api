@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
+import * as config from '@nestjs/config';
+import { createHash, randomBytes } from 'crypto';
 import { User } from '../domain/user.entity.js';
 import { AuthProvider } from '../domain/identity.entity.js';
 import { CreatedSession, SessionService } from './session.service.js';
+import authConfig from '../config/auth.config.js';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -10,27 +13,24 @@ import {
   IDENTITY_REPOSITORY,
   type IdentityRepository,
 } from '../interfaces/identity-repository.interface.js';
+import { EmailService } from './email.service.js';
 import { PasswordHasherService } from './password-hasher.service.js';
+import { type SignUpDto } from '../dto/sign-up.dto.js';
+import { type SignInDto } from '../dto/sign-in.dto.js';
 import { err, ok, Result } from '../utils/result.js';
 import { AuthError } from '../errors/auth-error.js';
 
-export interface SignUpInput {
-  email: string;
-  password: string;
-}
-
-export interface SignInInput {
-  email: string;
-  password: string;
-  rememberMe?: number | null;
+export type SignInInput = SignInDto & {
   userAgent?: string | null;
   ip?: string | null;
-}
+};
 
 export interface OAuthSignInInput {
   provider: AuthProvider;
   providerAccountId: string;
   email: string;
+  firstName: string;
+  lastName: string;
   emailVerified?: boolean;
   accessToken?: string | null;
   refreshToken?: string | null;
@@ -47,14 +47,21 @@ export interface SignInResult {
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(authConfig.KEY)
+    private readonly config: config.ConfigType<typeof authConfig>,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     @Inject(IDENTITY_REPOSITORY)
     private readonly identityRepository: IdentityRepository,
+    private readonly emailService: EmailService,
     private readonly passwordHasher: PasswordHasherService,
     private readonly sessionService: SessionService,
   ) {}
 
-  async signUp(input: SignUpInput): Promise<Result<User, AuthError>> {
+  private hashToken(rawToken: string): string {
+    return createHash('sha256').update(rawToken).digest('hex');
+  }
+
+  async signUp(input: SignUpDto): Promise<Result<User, AuthError>> {
     const existing = await this.userRepository.findByEmail(input.email);
     if (existing) {
       return err({ code: 'EMAIL_IN_USE' });
@@ -64,7 +71,12 @@ export class AuthService {
     const user = await this.userRepository.create({
       email: input.email,
       passwordHash,
+      firstName: input.firstName,
+      lastName: input.lastName,
     });
+
+    // Automatically generate and dispatch email verification token
+    await this.sendVerificationEmail(user, input.callback);
 
     return ok(user);
   }
@@ -84,6 +96,10 @@ export class AuthService {
       return err({ code: 'INVALID_CREDENTIALS' });
     }
 
+    if (!user.emailVerifiedAt) {
+      return err({ code: 'EMAIL_NOT_VERIFIED' });
+    }
+
     const session = await this.sessionService.createSession({
       id: user.id,
       rememberMe: input.rememberMe,
@@ -92,6 +108,14 @@ export class AuthService {
     });
 
     return ok({ user, session });
+  }
+
+  async getProfile(userId: string): Promise<Result<User, AuthError>> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      return err({ code: 'USER_NOT_FOUND' });
+    }
+    return ok(user);
   }
 
   async signInWithOAuth(
@@ -126,6 +150,8 @@ export class AuthService {
         user = await this.userRepository.create({
           email: input.email,
           passwordHash: null,
+          firstName: input.firstName,
+          lastName: input.lastName,
         });
         if (input.emailVerified) {
           await this.userRepository.markEmailVerified(user.id);
@@ -158,6 +184,122 @@ export class AuthService {
 
   async signOutAllDevices(userId: string): Promise<Result<void, AuthError>> {
     await this.sessionService.destroyAllForUser(userId);
+    return ok(undefined);
+  }
+
+  async sendVerificationEmail(
+    user: User,
+    callback?: string,
+  ): Promise<void> {
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const ttlMs = this.config.emailVerificationTtlHours * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + ttlMs);
+
+    await this.userRepository.setEmailVerificationToken(
+      user.id,
+      tokenHash,
+      expiresAt,
+    );
+
+    await this.emailService.sendVerificationEmail({
+      to: user.email,
+      firstName: user.firstName,
+      token: rawToken,
+      callback,
+    });
+  }
+
+  async resendEmailVerification(
+    email: string,
+    callback?: string,
+  ): Promise<Result<void, AuthError>> {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) {
+      return ok(undefined);
+    }
+
+    if (user.emailVerifiedAt) {
+      return err({ code: 'EMAIL_ALREADY_VERIFIED' });
+    }
+
+    await this.sendVerificationEmail(user, callback);
+    return ok(undefined);
+  }
+
+  async verifyEmail(token: string): Promise<Result<void, AuthError>> {
+    const tokenHash = this.hashToken(token);
+    const user =
+      await this.userRepository.findByEmailVerificationTokenHash(tokenHash);
+
+    if (!user || !user.emailVerificationExpiresAt) {
+      return err({ code: 'INVALID_OR_EXPIRED_TOKEN' });
+    }
+
+    if (user.emailVerificationExpiresAt.getTime() <= Date.now()) {
+      await this.userRepository.setEmailVerificationToken(user.id, null, null);
+      return err({ code: 'INVALID_OR_EXPIRED_TOKEN' });
+    }
+
+    await this.userRepository.markEmailVerified(user.id);
+    return ok(undefined);
+  }
+
+  async forgotPassword(
+    email: string,
+    callback?: string,
+  ): Promise<Result<void, AuthError>> {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) {
+      // Prevent user enumeration
+      return ok(undefined);
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const ttlMs = this.config.passwordResetTtlHours * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + ttlMs);
+
+    await this.userRepository.setPasswordResetToken(
+      user.id,
+      tokenHash,
+      expiresAt,
+    );
+
+    await this.emailService.sendPasswordResetEmail({
+      to: user.email,
+      firstName: user.firstName,
+      token: rawToken,
+      callback,
+    });
+
+    return ok(undefined);
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<Result<void, AuthError>> {
+    const tokenHash = this.hashToken(token);
+    const user =
+      await this.userRepository.findByPasswordResetTokenHash(tokenHash);
+
+    if (!user || !user.passwordResetExpiresAt) {
+      return err({ code: 'INVALID_OR_EXPIRED_TOKEN' });
+    }
+
+    if (user.passwordResetExpiresAt.getTime() <= Date.now()) {
+      await this.userRepository.setPasswordResetToken(user.id, null, null);
+      return err({ code: 'INVALID_OR_EXPIRED_TOKEN' });
+    }
+
+    const passwordHash = await this.passwordHasher.hash(newPassword);
+    await this.userRepository.updatePassword(user.id, passwordHash);
+    await this.userRepository.setPasswordResetToken(user.id, null, null);
+
+    // Invalidate all existing sessions on password reset for security
+    await this.sessionService.destroyAllForUser(user.id);
+
     return ok(undefined);
   }
 }

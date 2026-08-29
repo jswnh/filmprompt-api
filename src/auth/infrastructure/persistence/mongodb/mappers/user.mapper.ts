@@ -8,6 +8,12 @@ export class UserMapper {
       email: doc.email,
       passwordHash: doc.passwordHash ?? null,
       emailVerifiedAt: doc.emailVerifiedAt ?? null,
+      firstName: doc.firstName,
+      lastName: doc.lastName,
+      emailVerificationTokenHash: doc.emailVerificationTokenHash ?? null,
+      emailVerificationExpiresAt: doc.emailVerificationExpiresAt ?? null,
+      passwordResetTokenHash: doc.passwordResetTokenHash ?? null,
+      passwordResetExpiresAt: doc.passwordResetExpiresAt ?? null,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });

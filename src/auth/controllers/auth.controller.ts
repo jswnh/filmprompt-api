@@ -3,6 +3,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpException,
@@ -28,6 +29,22 @@ import {
   type GoogleTokenDto,
   googleTokenSchema,
 } from '../dto/google-token.dto.js';
+import {
+  type VerifyEmailDto,
+  verifyEmailSchema,
+} from '../dto/verify-email.dto.js';
+import {
+  type ResendVerificationDto,
+  resendVerificationSchema,
+} from '../dto/resend-verification.dto.js';
+import {
+  type ForgotPasswordDto,
+  forgotPasswordSchema,
+} from '../dto/forgot-password.dto.js';
+import {
+  type ResetPasswordDto,
+  resetPasswordSchema,
+} from '../dto/reset-password.dto.js';
 import {
   SessionGuard,
   type RequestWithSession,
@@ -55,6 +72,24 @@ function mapAuthErrorToHttpException(error: AuthError): HttpException {
         error: error.code,
         message: 'User not found.',
       });
+    case 'EMAIL_NOT_VERIFIED':
+      return new ForbiddenException({
+        statusCode: HttpStatus.FORBIDDEN,
+        error: error.code,
+        message: 'Please verify your email address before signing in.',
+      });
+    case 'INVALID_OR_EXPIRED_TOKEN':
+      return new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: error.code,
+        message: 'The token is invalid or has expired.',
+      });
+    case 'EMAIL_ALREADY_VERIFIED':
+      return new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        error: error.code,
+        message: 'This email is already verified.',
+      });
     default:
       return new InternalServerErrorException();
   }
@@ -77,7 +112,14 @@ export class AuthController {
     }
     return {
       ok: true as const,
-      user: { id: result.value.id, email: result.value.email },
+      user: {
+        id: result.value.id,
+        email: result.value.email,
+        firstName: result.value.firstName,
+        lastName: result.value.lastName,
+        emailVerified: Boolean(result.value.emailVerifiedAt),
+        emailVerifiedAt: result.value.emailVerifiedAt,
+      },
     };
   }
 
@@ -113,6 +155,10 @@ export class AuthController {
       user: {
         id: result.value.user.id,
         email: result.value.user.email,
+        firstName: result.value.user.firstName,
+        lastName: result.value.user.lastName,
+        emailVerified: Boolean(result.value.user.emailVerifiedAt),
+        emailVerifiedAt: result.value.user.emailVerifiedAt,
       },
     };
   }
@@ -151,8 +197,22 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(SessionGuard)
-  me(@CurrentUserId() userId: string) {
-    return { ok: true as const, userId };
+  async me(@CurrentUserId() userId: string) {
+    const result = await this.authService.getProfile(userId);
+    if (!result.ok) {
+      throw mapAuthErrorToHttpException(result.error);
+    }
+    return {
+      ok: true as const,
+      user: {
+        id: result.value.id,
+        email: result.value.email,
+        firstName: result.value.firstName,
+        lastName: result.value.lastName,
+        emailVerified: Boolean(result.value.emailVerifiedAt),
+        emailVerifiedAt: result.value.emailVerifiedAt,
+      },
+    };
   }
 
   @Get('google')
@@ -182,6 +242,8 @@ export class AuthController {
       provider: 'google',
       providerAccountId: user.id,
       email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       emailVerified: user.emailVerified,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -205,6 +267,10 @@ export class AuthController {
       user: {
         id: result.value.user.id,
         email: result.value.user.email,
+        firstName: result.value.user.firstName,
+        lastName: result.value.user.lastName,
+        emailVerified: Boolean(result.value.user.emailVerifiedAt),
+        emailVerifiedAt: result.value.user.emailVerifiedAt,
       },
     };
   }
@@ -223,6 +289,8 @@ export class AuthController {
       provider: 'google',
       providerAccountId: googleUser.id,
       email: googleUser.email,
+      firstName: googleUser.firstName,
+      lastName: googleUser.lastName,
       emailVerified: googleUser.emailVerified,
       rememberMe: body.rememberMe,
       userAgent: req.headers['user-agent'],
@@ -245,7 +313,80 @@ export class AuthController {
       user: {
         id: result.value.user.id,
         email: result.value.user.email,
+        firstName: result.value.user.firstName,
+        lastName: result.value.user.lastName,
+        emailVerified: Boolean(result.value.user.emailVerifiedAt),
+        emailVerifiedAt: result.value.user.emailVerifiedAt,
       },
+    };
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(verifyEmailSchema))
+  async verifyEmail(@Body() body: VerifyEmailDto) {
+    const result = await this.authService.verifyEmail(body.token);
+    if (!result.ok) {
+      throw mapAuthErrorToHttpException(result.error);
+    }
+    return { ok: true as const, message: 'Email verified successfully.' };
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(resendVerificationSchema))
+  async resendVerification(@Body() body: ResendVerificationDto) {
+    const result = await this.authService.resendEmailVerification(
+      body.email,
+      body.callback,
+    );
+    if (!result.ok) {
+      throw mapAuthErrorToHttpException(result.error);
+    }
+    return {
+      ok: true as const,
+      message:
+        'If an unverified account exists, a verification email has been sent.',
+    };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(forgotPasswordSchema))
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    const result = await this.authService.forgotPassword(
+      body.email,
+      body.callback,
+    );
+    if (!result.ok) {
+      throw mapAuthErrorToHttpException(result.error);
+    }
+    return {
+      ok: true as const,
+      message:
+        'If an account exists with that email, a password reset link has been sent.',
+    };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(resetPasswordSchema))
+  async resetPassword(
+    @Body() body: ResetPasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.resetPassword(
+      body.token,
+      body.password,
+    );
+    if (!result.ok) {
+      throw mapAuthErrorToHttpException(result.error);
+    }
+    res.clearCookie(this.sessionService.cookieName);
+    return {
+      ok: true as const,
+      message:
+        'Password has been reset successfully. Please log in with your new password.',
     };
   }
 }

@@ -18,6 +18,7 @@ import { PasswordHasherService } from './services/password-hasher.service.js';
 import { SessionService } from './services/session.service.js';
 import { AuthService } from './services/auth.service.js';
 import { GoogleAuthService } from './services/google-auth.service.js';
+import { EmailService } from './services/email.service.js';
 import { SessionGuard } from './guards/session.guard.js';
 
 const AUTH_REPOSITORIES = Symbol('AUTH_REPOSITORIES');
@@ -81,9 +82,16 @@ export class AuthModule {
         PasswordHasherService,
         SessionService,
         GoogleAuthService,
+        EmailService,
         SessionGuard,
       ],
-      exports: [AuthService, SessionService, GoogleAuthService, SessionGuard],
+      exports: [
+        AuthService,
+        SessionService,
+        GoogleAuthService,
+        EmailService,
+        SessionGuard,
+      ],
     };
   }
 }

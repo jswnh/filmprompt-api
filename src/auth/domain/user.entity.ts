@@ -3,6 +3,12 @@ export class User {
   email: string;
   passwordHash: string | null;
   emailVerifiedAt: Date | null;
+  firstName: string;
+  lastName: string;
+  emailVerificationTokenHash: string | null;
+  emailVerificationExpiresAt: Date | null;
+  passwordResetTokenHash: string | null;
+  passwordResetExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 

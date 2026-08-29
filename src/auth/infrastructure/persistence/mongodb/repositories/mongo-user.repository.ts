@@ -31,10 +31,14 @@ export class MongoUserRepository implements UserRepository {
     return doc ? UserMapper.toDomain(doc) : null;
   }
 
-  async create(user: Pick<User, 'email' | 'passwordHash'>): Promise<User> {
+  async create(
+    user: Pick<User, 'email' | 'passwordHash' | 'firstName' | 'lastName'>,
+  ): Promise<User> {
     const created = await this.userModel.create({
       email: user.email.toLowerCase().trim(),
       passwordHash: user.passwordHash,
+      firstName: user.firstName.trim(),
+      lastName: user.lastName.trim(),
     });
     return UserMapper.toDomain(created);
   }
@@ -51,7 +55,59 @@ export class MongoUserRepository implements UserRepository {
       return;
     }
     await this.userModel
-      .findByIdAndUpdate(userId, { emailVerifiedAt: new Date() })
+      .findByIdAndUpdate(userId, {
+        emailVerifiedAt: new Date(),
+        emailVerificationTokenHash: null,
+        emailVerificationExpiresAt: null,
+      })
+      .exec();
+  }
+
+  async findByEmailVerificationTokenHash(
+    tokenHash: string,
+  ): Promise<User | null> {
+    const doc = await this.userModel
+      .findOne({ emailVerificationTokenHash: tokenHash })
+      .exec();
+    return doc ? UserMapper.toDomain(doc) : null;
+  }
+
+  async findByPasswordResetTokenHash(tokenHash: string): Promise<User | null> {
+    const doc = await this.userModel
+      .findOne({ passwordResetTokenHash: tokenHash })
+      .exec();
+    return doc ? UserMapper.toDomain(doc) : null;
+  }
+
+  async setEmailVerificationToken(
+    userId: string,
+    tokenHash: string | null,
+    expiresAt: Date | null,
+  ): Promise<void> {
+    if (!Types.ObjectId.isValid(userId)) {
+      return;
+    }
+    await this.userModel
+      .findByIdAndUpdate(userId, {
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationExpiresAt: expiresAt,
+      })
+      .exec();
+  }
+
+  async setPasswordResetToken(
+    userId: string,
+    tokenHash: string | null,
+    expiresAt: Date | null,
+  ): Promise<void> {
+    if (!Types.ObjectId.isValid(userId)) {
+      return;
+    }
+    await this.userModel
+      .findByIdAndUpdate(userId, {
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: expiresAt,
+      })
       .exec();
   }
 }

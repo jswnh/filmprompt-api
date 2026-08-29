@@ -9,6 +9,14 @@ export interface AuthConfig {
   googleClientId: string | null;
   googleClientSecret: string | null;
   googleCallbackUrl: string | null;
+  emailVerificationTtlHours: number;
+  passwordResetTtlHours: number;
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  smtpSecure: boolean;
+  emailFrom: string;
   bcryptSaltRounds: number;
 }
 
@@ -29,5 +37,17 @@ export default registerAs('auth', (): AuthConfig => ({
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ??
     'http://localhost:3000/api/v1/auth/google/callback',
+  emailVerificationTtlHours: Number(
+    process.env.AUTH_EMAIL_VERIFICATION_TTL_HOURS ?? 24,
+  ),
+  passwordResetTtlHours: Number(
+    process.env.AUTH_PASSWORD_RESET_TTL_HOURS ?? 1,
+  ),
+  smtpHost: process.env.SMTP_HOST ?? null,
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpUser: process.env.SMTP_USER ?? null,
+  smtpPass: process.env.SMTP_PASS ?? null,
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  emailFrom: process.env.EMAIL_FROM ?? 'noreply@filmprompt.com',
   bcryptSaltRounds: Number(process.env.AUTH_BCRYPT_SALT_ROUNDS ?? 12),
 }));
