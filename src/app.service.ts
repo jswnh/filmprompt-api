@@ -24,7 +24,6 @@ export class MongoTestSchemaClass {
   @Prop({
     trim: true,
     required: true,
-    unique: true,
   })
   text: string;
 }

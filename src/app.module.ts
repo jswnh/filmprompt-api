@@ -16,6 +16,7 @@ import { MongoIdentityRepository } from './auth/infrastructure/persistence/mongo
 import authConfig from './auth/config/auth.config.js';
 import databaseConfig from './database/config/database.config.js';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AppThrottlerModule } from './throttler/throttler.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -52,6 +53,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     MongooseModule.forFeature([
       { name: MongoTestSchemaClass.name, schema: MongoTestSchema },
     ]),
+    AppThrottlerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
