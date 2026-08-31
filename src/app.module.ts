@@ -1,11 +1,7 @@
 import { Module } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
-import {
-  AppService,
-  MongoTestSchema,
-  MongoTestSchemaClass,
-} from './app.service.js';
+import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module.js';
@@ -15,8 +11,12 @@ import { MongoSessionRepository } from './auth/infrastructure/persistence/mongod
 import { MongoIdentityRepository } from './auth/infrastructure/persistence/mongodb/repositories/mongo-identity.repository.js';
 import authConfig from './auth/config/auth.config.js';
 import databaseConfig from './database/config/database.config.js';
-import { MongooseModule } from '@nestjs/mongoose';
+import tmdbConfig from './tmdb/config/tmdb.config.js';
+import aiConfig from './ai/config/ai.config.js';
 import { AppThrottlerModule } from './throttler/throttler.module.js';
+import { AiModule } from './ai/ai.module.js';
+import { SearchModule } from './search/search.module.js';
+import { TmdbModule } from './tmdb/tmdb.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,7 +24,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   imports: [
     ConfigModule.forRoot({
       envFilePath: '.env.local',
-      load: [authConfig, databaseConfig],
+      load: [authConfig, databaseConfig, tmdbConfig, aiConfig],
       isGlobal: true,
     }),
     ObserveModule.forRoot({
@@ -50,10 +50,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
         identityRepository,
       }),
     }),
-    MongooseModule.forFeature([
-      { name: MongoTestSchemaClass.name, schema: MongoTestSchema },
-    ]),
     AppThrottlerModule,
+    AiModule,
+    SearchModule,
+    TmdbModule,
   ],
   controllers: [AppController],
   providers: [AppService],
